@@ -17,6 +17,7 @@ import pendulum as pendulum
 import requests
 from airbyte_cdk.entrypoint import logger
 from airbyte_cdk.models import FailureType, SyncMode
+from airbyte_cdk.models import AirbyteMessage, AirbyteStream, ConfiguredAirbyteStream, DestinationSyncMode
 from airbyte_cdk.sources import Source
 from airbyte_cdk.sources.declarative.transformations import RecordTransformation
 from airbyte_cdk.sources.streams import CheckpointMixin, Stream
@@ -390,6 +391,8 @@ class Stream(HttpStream, ABC):
     @cached_property
     def _property_wrapper(self) -> IURLPropertyRepresentation:
         properties = list(self.properties.keys())
+        logger.info('Daniyar _property_wrapper _property_wrapper')
+        logger.info(properties)
         if "v1" in self.url:
             return APIv1Property(properties)
         if "v2" in self.url:
@@ -508,6 +511,19 @@ class Stream(HttpStream, ABC):
         response = None
 
         properties = self._property_wrapper
+
+        # available_properties = list(self.properties.keys())
+        # if self.configured_json_schema and self.configured_json_schema.get("properties"):
+        #     configured_properties = list(self.configured_json_schema.get("properties").keys())
+        #     if 'properties' in configured_properties: ## means that all properties are requested.
+        #         properties = available_properties
+        #     else:
+        #         configured_properties = [x.removeprefix('properties_') for x in configured_properties]
+        #         properties = [x for x in available_properties if x in configured_properties]
+        # else:
+        #     properties = available_properties
+        # properties = APIv3Property(properties)
+
         for chunk in properties.split():
             response = self.handle_request(
                 stream_slice=stream_slice, stream_state=stream_state, next_page_token=next_page_token, properties=chunk
@@ -839,12 +855,22 @@ class Stream(HttpStream, ABC):
         data, response = self._api.get(f"/properties/v2/{self.entity}/properties")
         for row in data:
             props[row["name"]] = self._get_field_props(row["type"])
-
         if self._transformations:
             for transformation in self._transformations:
                 transformation.transform(record_or_schema=props)
 
+        logger.info('Daniyar PROPERTIES self.configured_json_schema')
+        logger.info(self.configured_json_schema)
+        if self.configured_json_schema and self.configured_json_schema.get("properties"):
+            configured_properties = list(self.configured_json_schema.get("properties").keys())
+            logger.info('DANIYAR TTTTT configured_properties first FULL SYNC PROPS')
+            logger.info(configured_properties)
+
         return props
+
+    def properties_clear_cache(self):
+        Stream.properties.fget.cache_clear()
+        Stream._property_wrapper.cache_clear()
 
     def properties_scope_is_granted(self):
         return not self.properties_scopes - self.granted_scopes if self.properties_scopes and self.granted_scopes else True
@@ -1116,6 +1142,7 @@ class CRMSearchStream(IncrementalStream, ABC):
     last_modified_field: str = None
     associations: List[str] = []
     fully_qualified_name: str = None
+    total_displayed = False
 
     # added to guarantee the data types, declared for the stream's schema
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
@@ -1153,7 +1180,24 @@ class CRMSearchStream(IncrementalStream, ABC):
         last_id=None,
     ) -> Tuple[List, requests.Response]:
         stream_records = {}
-        properties_list = list(self.properties.keys())
+
+        available_properties = list(self.properties.keys())
+
+        if self.configured_json_schema and self.configured_json_schema.get("properties"):
+            configured_properties = list(self.configured_json_schema.get("properties").keys())
+            # logger.info('configured_properties first')
+            # logger.info(configured_properties)
+
+            if 'properties' in configured_properties: ## means that all properties are requested.
+                properties_list = available_properties
+            else:
+                configured_properties = [x.removeprefix('properties_') for x in configured_properties]
+                # logger.info('configured_properties second')
+                # logger.info(configured_properties)
+                properties_list = [x for x in available_properties if x in configured_properties]
+        else:
+            properties_list = available_properties
+
         if last_id == None:
             last_id = 0
         # The search query below uses the following criteria:
@@ -1184,7 +1228,16 @@ class CRMSearchStream(IncrementalStream, ABC):
         if next_page_token:
             payload.update(next_page_token["payload"])
 
+        logger.info('DANIYAR payload first')
+        logger.info(payload)
+
+
         response, raw_response = self.search(url=self.url, data=payload)
+
+        if self.total_displayed == False:
+            logger.info(f"Total changed records:{response['total']}")
+            self.total_displayed = True
+
         for record in self._transform(self.parse_response(raw_response, stream_state=stream_state, stream_slice=stream_slice)):
             stream_records[record["id"]] = record
 
@@ -1231,10 +1284,21 @@ class CRMSearchStream(IncrementalStream, ABC):
         last_id = None
         max_last_id = None
 
+        self.json_schema_is_configured = False
+
         while not pagination_complete:
+
+            if self.configured_json_schema and not self.json_schema_is_configured:
+                logger.info('Clearing cache..')
+                self.json_schema_is_configured = True
+                self.properties_clear_cache()
+
             if self.state:
                 records, raw_response = self._process_search(
-                    next_page_token=next_page_token, stream_state=stream_state, stream_slice=stream_slice, last_id=max_last_id
+                    next_page_token=next_page_token,
+                    stream_state=stream_state,
+                    stream_slice=stream_slice,
+                    last_id=max_last_id
                 )
                 if self.associations:
                     records = self._read_associations(records)
@@ -1246,7 +1310,8 @@ class CRMSearchStream(IncrementalStream, ABC):
                 )
                 records = self._flat_associations(records)
             records = self._filter_old_records(records)
-            records = self.record_unnester.unnest(records)
+            ## Daniyar: TEST UNNESTED VERSION
+            # records = self.record_unnester.unnest(records)
 
             for record in records:
                 last_id = self.get_max(record[self.primary_key], last_id) if last_id else record[self.primary_key]
@@ -1536,6 +1601,8 @@ class Deals(CRMSearchStream):
     primary_key = "id"
     scopes = {"contacts", "crm.objects.deals.read"}
     _transformations = [NewtoLegacyFieldTransformation(field_mapping=DEALS_NEW_TO_LEGACY_FIELDS_MAPPING)]
+
+
 
 
 class DealsArchived(ClientSideIncrementalStream):
