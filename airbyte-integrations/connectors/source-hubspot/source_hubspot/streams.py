@@ -391,8 +391,8 @@ class Stream(HttpStream, ABC):
     @cached_property
     def _property_wrapper(self) -> IURLPropertyRepresentation:
         properties = list(self.properties.keys())
-        logger.info('Daniyar _property_wrapper _property_wrapper')
-        logger.info(properties)
+        # logger.info('Daniyar _property_wrapper _property_wrapper')
+        # logger.info(properties)
         if "v1" in self.url:
             return APIv1Property(properties)
         if "v2" in self.url:
@@ -480,6 +480,19 @@ class Stream(HttpStream, ABC):
             data=self.request_body_data(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token),
         )
         request_kwargs = self.request_kwargs(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
+        # try:
+        #     if not self.one_time_message:
+        #         logger.info('Daniyar self.request_body_json(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)')
+        #         logger.info(self.request_body_json(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token))
+        #         logger.info('request_params')
+        #         logger.info(request_params)
+        #         logger.info('self.request_body_data(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token),')
+        #         logger.info(self.request_body_data(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token),)
+        # except:
+        #     pass
+
+
+
 
         if self.use_cache:
             # use context manager to handle and store cassette metadata
@@ -491,7 +504,11 @@ class Stream(HttpStream, ABC):
 
         else:
             response = self._send_request(request, request_kwargs)
-
+        # try:
+        #     logger.info('response')
+        #     logger.info(response.json())
+        # except:
+        #     pass
         return response
 
     def _read_stream_records(
@@ -505,12 +522,18 @@ class Stream(HttpStream, ABC):
         #  to get all properties for an entity. According to HubSpot Community
         #  (https://community.hubspot.com/t5/APIs-Integrations/Get-all-contact-properties-without-explicitly-listing-them/m-p/447950)
         #  and the official documentation, this does not exist at the moment.
+        # if not self.one_time_message:
+        #     logger.info('Daniyar _read_stream_records')
 
         group_by_pk = self.primary_key and not self.denormalize_records
         post_processor: IRecordPostProcessor = GroupByKey(self.primary_key) if group_by_pk else StoreAsIs()
         response = None
 
         properties = self._property_wrapper
+        # if not self.one_time_message:
+        #     logger.info('Daniyar properties')
+        #     logger.info(self.properties.keys())
+
 
         # available_properties = list(self.properties.keys())
         # if self.configured_json_schema and self.configured_json_schema.get("properties"):
@@ -692,11 +715,14 @@ class Stream(HttpStream, ABC):
     def _cast_record_fields_if_needed(self, record: Mapping, properties: Mapping[str, Any] = None) -> Mapping:
         if not self.entity or not record.get("properties"):
             return record
-
         properties = properties or self.properties
+        # logger.info('Daniyar _cast_record_fields_if_needed record["properties"].items()')
+        # logger.info(record["properties"].items())
 
         for field_name, field_value in record["properties"].items():
             if field_name not in properties:
+                if field_name.startswith('hs_time_in_'):
+                    continue
                 self.logger.info(
                     "Property discarded: not maching with properties schema: record id:{}, property_value: {}".format(
                         record.get("id"), field_name
@@ -710,6 +736,8 @@ class Stream(HttpStream, ABC):
             record["properties"][field_name] = self._cast_value(
                 declared_field_types=declared_field_types, field_name=field_name, field_value=field_value, declared_format=format
             )
+        # logger.info('Daniyar _cast_record_fields_if_needed record')
+        # logger.info(record)
 
         return record
 
@@ -855,22 +883,37 @@ class Stream(HttpStream, ABC):
         data, response = self._api.get(f"/properties/v2/{self.entity}/properties")
         for row in data:
             props[row["name"]] = self._get_field_props(row["type"])
+
+        # logger.info('Daniyar PROPERTIES self.configured_json_schema')
+        # logger.info(self.configured_json_schema)
+        if self.configured_json_schema and self.configured_json_schema.get("properties"):
+            api_props = props.copy()
+            default_props = ['hs_lastmodifieddate', 'createdate', 'hs_object_id']
+            default_props = {key: api_props[key] for key in default_props if key in api_props.keys()}
+            default_date_fields_prefixes = ('hs_v2_date_entered_', 'hs_v2_date_exited_')
+            default_date_fields = {key: api_props[key]
+                                   for key in api_props.keys() if key.startswith(default_date_fields_prefixes)}
+
+            configured_props = self.configured_json_schema.get("properties")
+            configured_props = {key.removeprefix('properties_'): configured_props[key]  for key in configured_props}
+            ## Keep only those default fields that do not already exist in the configured schema
+            default_props = {key: default_props[key] for key in default_props if key not in configured_props.keys()}
+            default_date_fields = {key: default_date_fields[key] for key in default_date_fields if key not in configured_props.keys()}
+            configured_props.update(default_props)
+            configured_props.update(default_date_fields)
+            props = configured_props
+            # logger.info('DANIYAR TTTTT configured_properties first FULL SYNC PROPS')
+            # logger.info(props)
+
         if self._transformations:
             for transformation in self._transformations:
                 transformation.transform(record_or_schema=props)
-
-        logger.info('Daniyar PROPERTIES self.configured_json_schema')
-        logger.info(self.configured_json_schema)
-        if self.configured_json_schema and self.configured_json_schema.get("properties"):
-            configured_properties = list(self.configured_json_schema.get("properties").keys())
-            logger.info('DANIYAR TTTTT configured_properties first FULL SYNC PROPS')
-            logger.info(configured_properties)
 
         return props
 
     def properties_clear_cache(self):
         Stream.properties.fget.cache_clear()
-        Stream._property_wrapper.cache_clear()
+        self.__dict__.pop('_property_wrapper', None)
 
     def properties_scope_is_granted(self):
         return not self.properties_scopes - self.granted_scopes if self.properties_scopes and self.granted_scopes else True
@@ -975,6 +1018,7 @@ class AssociationsStream(Stream):
 
     http_method = "POST"
     filter_old_records = False
+    one_time_message = False
 
     def __init__(self, parent_stream: Stream, identifiers: Iterable[Union[int, str]], *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1143,6 +1187,7 @@ class CRMSearchStream(IncrementalStream, ABC):
     associations: List[str] = []
     fully_qualified_name: str = None
     total_displayed = False
+    one_time_message = False
 
     # added to guarantee the data types, declared for the stream's schema
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
@@ -1181,22 +1226,23 @@ class CRMSearchStream(IncrementalStream, ABC):
     ) -> Tuple[List, requests.Response]:
         stream_records = {}
 
-        available_properties = list(self.properties.keys())
-
-        if self.configured_json_schema and self.configured_json_schema.get("properties"):
-            configured_properties = list(self.configured_json_schema.get("properties").keys())
-            # logger.info('configured_properties first')
-            # logger.info(configured_properties)
-
-            if 'properties' in configured_properties: ## means that all properties are requested.
-                properties_list = available_properties
-            else:
-                configured_properties = [x.removeprefix('properties_') for x in configured_properties]
-                # logger.info('configured_properties second')
-                # logger.info(configured_properties)
-                properties_list = [x for x in available_properties if x in configured_properties]
-        else:
-            properties_list = available_properties
+        properties_list = list(self.properties.keys())
+        # logger.info('DANIYAR payload first available_properties')
+        # logger.info(available_properties)
+        #
+        #
+        # if self.configured_json_schema and self.configured_json_schema.get("properties"):
+        #     configured_properties = list(self.configured_json_schema.get("properties").keys())
+        #     if 'properties' in configured_properties: ## means that all properties are requested.
+        #         properties_list = available_properties
+        #     else:
+        #         configured_properties = [x.removeprefix('properties_') for x in configured_properties]
+        #         properties_list = [x for x in available_properties if x in configured_properties]
+        #         logger.info('DANIYAR payload first properties_list')
+        #         logger.info(properties_list)
+        #
+        # else:
+        #     properties_list = available_properties
 
         if last_id == None:
             last_id = 0
@@ -1228,11 +1274,22 @@ class CRMSearchStream(IncrementalStream, ABC):
         if next_page_token:
             payload.update(next_page_token["payload"])
 
-        logger.info('DANIYAR payload first')
-        logger.info(payload)
-
+        # logger.info('DANIYAR payload')
+        # logger.info(payload)
 
         response, raw_response = self.search(url=self.url, data=payload)
+
+        # try:
+        #     logger.info('DANIYAR raw_response')
+        #     logger.info(raw_response.__dict__)
+        # except:
+        #     pass
+        # try:
+        #     logger.info('DANIYAR response')
+        #     logger.info(response)
+        # except:
+        #     pass
+
 
         if self.total_displayed == False:
             logger.info(f"Total changed records:{response['total']}")
@@ -1252,7 +1309,7 @@ class CRMSearchStream(IncrementalStream, ABC):
         slices = associations_stream.stream_slices(sync_mode=SyncMode.full_refresh)
 
         for _slice in slices:
-            logger.info(f"Reading {_slice} associations of {self.entity}")
+            # logger.info(f"Reading {_slice} associations of {self.entity}")
             associations = associations_stream.read_records(stream_slice=_slice, sync_mode=SyncMode.full_refresh)
             for group in associations:
                 current_record = records_by_pk[group["from"]["id"]]
@@ -1285,6 +1342,9 @@ class CRMSearchStream(IncrementalStream, ABC):
         max_last_id = None
 
         self.json_schema_is_configured = False
+        self.one_time_message = False
+        self.cumulative_total_count = 0
+        self.cumulative_filtered_count = 0
 
         while not pagination_complete:
 
@@ -1292,6 +1352,9 @@ class CRMSearchStream(IncrementalStream, ABC):
                 logger.info('Clearing cache..')
                 self.json_schema_is_configured = True
                 self.properties_clear_cache()
+                logger.info('=' * 400)
+                logger.info(self.properties.keys())
+                logger.info('=' * 400)
 
             if self.state:
                 records, raw_response = self._process_search(
@@ -1300,24 +1363,47 @@ class CRMSearchStream(IncrementalStream, ABC):
                     stream_slice=stream_slice,
                     last_id=max_last_id
                 )
+                # logger.info('Daniyar self.associations')
+                # logger.info(self.associations)
+                all_records_count = len(records)
+                self.cumulative_total_count += all_records_count
+
                 if self.associations:
                     records = self._read_associations(records)
             else:
+                # if not self.one_time_message:
+                #     logger.info('Daniyar records, raw_response = self._read_stream_records(')
                 records, raw_response = self._read_stream_records(
                     stream_slice=stream_slice,
                     stream_state=stream_state,
                     next_page_token=next_page_token,
                 )
+                all_records_count = len(records)
+                self.cumulative_total_count += all_records_count
                 records = self._flat_associations(records)
+                # if not self.one_time_message:
+                    # logger.info('Daniyar records')
+                    # logger.info(records)
+                    # try:
+                    #     logger.info('Daniyar raw_response')
+                    #     logger.info(raw_response.json())
+                    # except:
+                    #     logger.info('Daniyar raw_response FAILED')
+
+
+            self.one_time_message = True
             records = self._filter_old_records(records)
+
             ## Daniyar: TEST UNNESTED VERSION
             # records = self.record_unnester.unnest(records)
-
+            current_request_filtered = 0
             for record in records:
+                current_request_filtered += 1
                 last_id = self.get_max(record[self.primary_key], last_id) if last_id else record[self.primary_key]
                 yield record
-
+            self.cumulative_filtered_count += current_request_filtered
             next_page_token = self.next_page_token(raw_response)
+            logger.info(f'next_page_token: {next_page_token}, max_last_id: {max_last_id}, total records: {self.cumulative_filtered_count}({self.cumulative_total_count}), current request records: {current_request_filtered}({all_records_count})')
             if not next_page_token:
                 pagination_complete = True
             elif self.state and next_page_token["payload"]["after"] >= 10000:
