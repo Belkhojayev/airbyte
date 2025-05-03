@@ -888,7 +888,7 @@ class Stream(HttpStream, ABC):
         # logger.info(self.configured_json_schema)
         if self.configured_json_schema and self.configured_json_schema.get("properties"):
             api_props = props.copy()
-            default_props = ['hs_lastmodifieddate', 'createdate', 'hs_object_id']
+            default_props = ['lastmodifieddate','hs_lastmodifieddate', 'createdate', 'hs_object_id']
             default_props = {key: api_props[key] for key in default_props if key in api_props.keys()}
             default_date_fields_prefixes = ('hs_v2_date_entered_', 'hs_v2_date_exited_')
             default_date_fields = {key: api_props[key]
@@ -1184,7 +1184,9 @@ class CRMSearchStream(IncrementalStream, ABC):
     state_pk = "updatedAt"
     updated_at_field = "updatedAt"
     last_modified_field: str = None
-    time_filter_fields: List[str] = [] # Daniyar: the list of fields to use in filter for incremental sync
+    time_filter_fields: List[str] = []           # Daniyar: the list of fields to use in filter for incremental sync
+    time_filter_fields_lookback_days: int = 0    # Daniyar: the look back time period for the fields
+    time_filter_fields_lookforward_days: int = 0    # Daniyar: the look forward time period for the fields
     associations: List[str] = []
     fully_qualified_name: str = None
     total_displayed = False
@@ -1229,8 +1231,6 @@ class CRMSearchStream(IncrementalStream, ABC):
         stream_records = {}
 
         properties_list = list(self.properties.keys())
-        # logger.info('DANIYAR payload first available_properties')
-        # logger.info(available_properties)
         #
         #
         # if self.configured_json_schema and self.configured_json_schema.get("properties"):
@@ -1260,7 +1260,29 @@ class CRMSearchStream(IncrementalStream, ABC):
         if key == "id":
             key = "hs_object_id"
         if self.state:
-            if self.last_modified_field:
+            if self.time_filter_fields:
+                payload = {
+                    "filterGroups": [
+                        {
+                            "filters": [
+                                {"value": int((self._state-timedelta(days=self.time_filter_fields_lookback_days)).timestamp()) * 1000,
+                                 "highValue": int((self._init_sync+timedelta(days=self.time_filter_fields_lookforward_days)).timestamp() * 1000),
+                                 "propertyName": field,
+                                 "operator": "BETWEEN"},
+                                {"value": int(self._state.timestamp() * 1000),
+                                 "highValue": int(self._init_sync.timestamp() * 1000),
+                                 "propertyName": self.last_modified_field,
+                                 "operator": "BETWEEN"},
+                                {"value": last_id, "propertyName": key, "operator": "GTE"}  # Mandatory condition
+                            ]
+                        }
+                        for field in self.time_filter_fields  # list comprehension over all filter fields
+                    ],
+                    "sorts": [{"propertyName": key, "direction": "ASCENDING"}],
+                    "properties": properties_list,
+                    "limit": 100,
+                }
+            elif self.last_modified_field:
                 payload = {
                         "filters": [
                             {"value": int(self._state.timestamp() * 1000), "propertyName": self.last_modified_field, "operator": "GTE"},
@@ -1271,22 +1293,7 @@ class CRMSearchStream(IncrementalStream, ABC):
                         "properties": properties_list,
                         "limit": 100,
                     }
-            elif self.time_filter_fields:
-                payload = {
-                    "filterGroups": [
-                        {
-                            "filters": [
-                                {"value": int(self._state.timestamp() * 1000), "propertyName": field, "operator": "GTE"},
-                                {"value": int(self._init_sync.timestamp() * 1000), "propertyName": field, "operator": "LTE"},
-                                {"value": last_id, "propertyName": key, "operator": "GTE"}  # Mandatory condition
-                            ]
-                        }
-                        for field in self.time_filter_fields  # list comprehension over all filter fields
-                    ],
-                    "sorts": [{"propertyName": key, "direction": "ASCENDING"}],
-                    "properties": properties_list,
-                    "limit": 100,
-                }
+
         else:
             payload = {}
         payload = (payload)
@@ -1424,10 +1431,20 @@ class CRMSearchStream(IncrementalStream, ABC):
             self.cumulative_filtered_count += current_request_filtered
             next_page_token = self.next_page_token(raw_response)
             percent_done = None
+            percent_done_str = None
+            time_left = None
             if self.total_records_to_sync:
                 percent_done = round(float(self.cumulative_filtered_count)/self.total_records_to_sync*100,2)
-            #logger.info(f'next_page_token: {next_page_token}, max_last_id: {max_last_id}, total records: {self.cumulative_filtered_count}({self.cumulative_total_count}), current request records: {current_request_filtered}({all_records_count})')
-            logger.info(f'max_last_id: {max_last_id}, total records: {self.cumulative_filtered_count}({self.cumulative_total_count}) out of  {self.total_records_to_sync} ({percent_done}%)')
+                percent_done_str = f"{percent_done:5.2f}"
+                if percent_done>10:
+                    elapsed_time = (pendulum.now() - self._init_sync).seconds
+                    time_left = round(((elapsed_time * 100) / percent_done - elapsed_time)/60, 1)
+                else:
+                    time_left = 'TBD after 10%'
+                logger.info(f'Total records: {str(self.cumulative_filtered_count):>6} ' +
+                            f'out of {str(self.total_records_to_sync):>7} ({str(percent_done_str)}%). ' +
+                            f'Minutes left: {time_left:>5} '
+                            )
             if not next_page_token:
                 pagination_complete = True
             elif self.state and next_page_token["payload"]["after"] >= 10000:
@@ -1706,10 +1723,10 @@ class Deals(CRMSearchStream):
     """Deals, API v3"""
 
     entity = "deal"
-    # Daniyar: last_modified_field is not used, because it causes too many deals to be syncronized.
-    #          Instead we use custom list of fields: time_filter_fields
-    # last_modified_field = "hs_lastmodifieddate"
+    last_modified_field = "hs_lastmodifieddate"
     time_filter_fields = ["createdate","prepayment_date","closedate"]
+    time_filter_fields_lookback_days    = 14
+    time_filter_fields_lookforward_days = 60
     associations = ["contacts", "companies", "line_items"]
     primary_key = "id"
     scopes = {"contacts", "crm.objects.deals.read"}
@@ -2398,7 +2415,7 @@ class Companies(CRMSearchStream):
 
 class Contacts(CRMSearchStream):
     entity = "contact"
-    last_modified_field = "hs_lastmodifieddate"
+    last_modified_field = "lastmodifieddate"
     associations = ["contacts", "companies"]
     primary_key = "id"
     scopes = {"crm.objects.contacts.read"}
