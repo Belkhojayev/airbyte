@@ -890,17 +890,17 @@ class Stream(HttpStream, ABC):
             api_props = props.copy()
             default_props = ['lastmodifieddate','hs_lastmodifieddate', 'createdate', 'hs_object_id']
             default_props = {key: api_props[key] for key in default_props if key in api_props.keys()}
-            default_date_fields_prefixes = ('hs_v2_date_entered_', 'hs_v2_date_exited_')
-            default_date_fields = {key: api_props[key]
-                                   for key in api_props.keys() if key.startswith(default_date_fields_prefixes)}
+            # default_date_fields_prefixes = ('hs_v2_date_entered_', 'hs_v2_date_exited_')
+            # default_date_fields = {key: api_props[key]
+            #                        for key in api_props.keys() if key.startswith(default_date_fields_prefixes)}
 
             configured_props = self.configured_json_schema.get("properties")
             configured_props = {key.removeprefix('properties_'): configured_props[key]  for key in configured_props}
             ## Keep only those default fields that do not already exist in the configured schema
             default_props = {key: default_props[key] for key in default_props if key not in configured_props.keys()}
-            default_date_fields = {key: default_date_fields[key] for key in default_date_fields if key not in configured_props.keys()}
+            # default_date_fields = {key: default_date_fields[key] for key in default_date_fields if key not in configured_props.keys()}
             configured_props.update(default_props)
-            configured_props.update(default_date_fields)
+            # configured_props.update(default_date_fields)
             props = configured_props
             # logger.info('DANIYAR TTTTT configured_properties first FULL SYNC PROPS')
             # logger.info(props)
