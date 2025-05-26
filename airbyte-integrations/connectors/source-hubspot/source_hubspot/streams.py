@@ -1727,6 +1727,9 @@ class Deals(CRMSearchStream):
     time_filter_fields = ["createdate","prepayment_date","closedate"]
     time_filter_fields_lookback_days    = 14
     time_filter_fields_lookforward_days = 60
+
+    time_filter_fields = [] ## Disabled the new approach, going back to hs_lastmodifieddate
+
     associations = ["contacts", "companies", "line_items"]
     primary_key = "id"
     scopes = {"contacts", "crm.objects.deals.read"}
