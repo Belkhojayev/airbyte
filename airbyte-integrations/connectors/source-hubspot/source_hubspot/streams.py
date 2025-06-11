@@ -492,8 +492,6 @@ class Stream(HttpStream, ABC):
         #     pass
 
 
-
-
         if self.use_cache:
             # use context manager to handle and store cassette metadata
             with self.cache_file as cass:
@@ -531,7 +529,7 @@ class Stream(HttpStream, ABC):
 
         properties = self._property_wrapper
         # if not self.one_time_message:
-        #     logger.info('Daniyar properties')
+        #     logger.info('Daniyar properties 444 _read_stream_records _read_stream_records')
         #     logger.info(self.properties.keys())
 
 
@@ -1261,6 +1259,7 @@ class CRMSearchStream(IncrementalStream, ABC):
             key = "hs_object_id"
         if self.state:
             if self.time_filter_fields:
+                ## Daniyar: This approach is not affective, unless we have a replacement for hs_lastmodifieddate created by CRM team
                 payload = {
                     "filterGroups": [
                         {
@@ -1430,9 +1429,8 @@ class CRMSearchStream(IncrementalStream, ABC):
                 yield record
             self.cumulative_filtered_count += current_request_filtered
             next_page_token = self.next_page_token(raw_response)
-            percent_done = None
-            percent_done_str = None
-            time_left = None
+
+            ## Daniyar: the block below only logs the progress
             if self.total_records_to_sync:
                 percent_done = round(float(self.cumulative_filtered_count)/self.total_records_to_sync*100,2)
                 percent_done_str = f"{percent_done:5.2f}"
@@ -1724,10 +1722,11 @@ class Deals(CRMSearchStream):
 
     entity = "deal"
     last_modified_field = "hs_lastmodifieddate"
+
+
     time_filter_fields = ["createdate","prepayment_date","closedate"]
     time_filter_fields_lookback_days    = 14
     time_filter_fields_lookforward_days = 60
-
     time_filter_fields = [] ## Disabled the new approach, going back to hs_lastmodifieddate
 
     associations = ["contacts", "companies", "line_items"]
