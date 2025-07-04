@@ -1,0 +1,56 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": ["number"]
+      },
+      "active": {
+        "type": ["null", "boolean"]
+      },
+      "active_analytic_distribution": {
+        "type": ["null", "boolean"]
+      },
+      "color": {
+        "type": ["null", "number"]
+      },
+      "company_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "analytic_distribution_ids": {
+        "type": ["null", "number", "boolean", "string"]
+      },
+      "name": {
+        "type": ["null", "string"]
+      },
+      "display_name": {
+        "type": ["null", "string"]
+      },
+      "create_uid": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "write_uid": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "create_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "write_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      }
+    }
+}

@@ -1,0 +1,36 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": ["number"]
+      },
+      "display_name": {
+        "type": ["null", "string"]
+      },
+      "partner_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "order_line": {
+        "type": ["null", "array"],
+        "items":{
+          "type": ["number"]
+        }
+      },
+      "amount_total": {
+        "type": ["null", "number"]
+      },
+      "create_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "write_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      }
+    }
+}

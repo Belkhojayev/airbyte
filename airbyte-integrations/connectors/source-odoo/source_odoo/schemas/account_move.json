@@ -1,0 +1,82 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": ["number"]
+      },
+      "move_type": {
+        "type": ["null", "string"]
+      },
+      "name": {
+        "type": ["null", "string"]
+      },
+      "date": {
+        "type": ["null", "string"],
+        "format": "date"
+      },
+      "partner_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "partner_vat": {
+        "type": ["null", "string"]
+      },
+      "invoice_date": {
+        "type": ["null", "string"]
+      },
+      "invoice_date_due": {
+        "type": ["null", "string"]
+      },
+      "company_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "amount_untaxed_signed": {
+        "type": ["null", "number"]
+      },
+      "amount_total_signed": {
+        "type": ["null", "number"]
+      },
+      "sale_order_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "sale_order_name": {
+        "type": ["null", "string"]
+      },
+      "hubspot_deals": {
+        "type": ["null", "string"]
+      },            
+      "state": {
+        "type": ["null", "string"]
+      },
+      "payment_state": {
+        "type": ["null", "string"]
+      },
+      "invoice_line_ids": {
+        "type": ["null", "array"],
+        "items": {"type": "number"}
+      },
+      "create_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "reversed_entry_id": {
+        "type": ["null", "number"]
+      },
+      "write_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      }
+    }
+}

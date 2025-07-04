@@ -1,0 +1,43 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": ["number"]
+      },
+      "move_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "product_id": {
+        "type": ["null", "number", "boolean", "string"]
+      },
+      "quantity": {
+        "type": ["null", "number"]
+      },
+      "price_unit": {
+        "type": ["null", "number"]
+      },
+      "price_subtotal": {
+        "type": ["null", "number"]
+      },
+      "create_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "write_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "analytic_tag_ids": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      }
+    }
+}

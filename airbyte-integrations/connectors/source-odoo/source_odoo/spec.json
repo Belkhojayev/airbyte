@@ -1,0 +1,44 @@
+{
+  "documentationUrl": "https://docsurl.com",
+  "connectionSpecification": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Source Splitit Report Test Spec",
+    "type": "object",
+    "required": ["SERVER", "DATABASE", "USERNAME", "PASSWORD"],
+    "additionalProperties": true,
+    "properties": {
+      "SERVER": {
+        "type": "string",
+        "description": "Odoo Server",
+        "order": 1
+      },
+      "DATABASE": {
+        "type": "string",
+        "description": "Database name",
+        "order": 2
+      },
+      "USERNAME": {
+        "type": "string",
+        "description": "Username to login",
+        "order": 3
+      },
+      "PASSWORD": {
+        "type": "string",
+        "description": "Password to authenticate",
+        "airbyte_secret": true,
+        "order": 4
+      },
+      "chunk_size": {
+        "type": "integer",
+        "description": "Chunk size",
+        "default": 1000000,
+        "order": 5
+      },
+      "end_date": {
+        "type": "string",
+        "description": "End date (For periodic load). For example: 2022-12-31T23:59:59",
+        "order": 6
+      }
+    }
+  }
+}

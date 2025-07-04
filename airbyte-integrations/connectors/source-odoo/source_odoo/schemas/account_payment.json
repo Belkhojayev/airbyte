@@ -1,0 +1,40 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": ["number"]
+      },
+      "display_name": {
+        "type": ["null", "string"]
+      },
+      "payment_method_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "payment_type": {
+        "type": ["null", "string"]
+      },
+      "company_id": {
+        "type": ["null", "array"],
+        "items": [
+          {"type": "number"},
+          {"type": "string"}
+        ]
+      },
+      "amount_total": {
+        "type": ["null", "number"]
+      },
+      "create_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "write_date": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      }
+    }
+}

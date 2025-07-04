@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!main.py
+!source_odoo
+!setup.py
+!secrets
